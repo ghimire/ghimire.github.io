@@ -1,0 +1,116 @@
+DarkNet IPTABLES/Firewall Policy - ghimire
+
+Date: 8 August 2008
+  To: DarkNet SAs (System Administrators)
+
+SUBJECT: DarkNet IPTABLES/Firewall Policy
+
+PURPOSE: The purpose of this document is to outline the baseline policy for
+configuring and securing iptables and firewall accordingly.
+
+SCOPE: 
+        o Configuration
+
+CONFIGURATION
+
+I.  The following rules outline the basic iptables rules:
+	
+	-- Copy Paste Starts--
+	# Flush Rules
+	iptables -P INPUT ACCEPT
+	iptables -P FORWARD ACCEPT
+	iptables -P OUTPUT ACCEPT
+	iptables -F
+	iptables -X
+	iptables -t nat -F
+	iptables -F FORWARD
+
+	# Accept forwarded packets for darknet IP Block
+	iptables -A FORWARD -s 2.0.0.0/8 -j ACCEPT
+	iptables -A FORWARD -d 2.0.0.0/8 -j ACCEPT
+	
+	# Reject remaining forwarded packets
+	iptables -A FORWARD -s 0.0.0.0 -d 0.0.0.0 -j REJECT \
+		 --reject-with icmp-port-unreachable
+
+	# New Chains
+	iptables -N open
+	iptables -N interfaces
+	
+	# Accept ICMP and Established connections
+	iptables -A INPUT -p icmp -j ACCEPT
+	iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+	
+	# Deal with the chains accordingly (rules are defined below)
+	iptables -A INPUT -j interfaces
+	iptables -A INPUT -j open
+
+	# Reject remaining tcp and udp packets
+	iptables -A INPUT -p tcp -j REJECT --reject-with tcp-reset
+	iptables -A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable
+	iptables -P INPUT DROP
+	iptables -P FORWARD DROP
+
+	# Accept outbound and self
+	iptables -P OUTPUT ACCEPT
+	iptables -A interfaces -i lo -j ACCEPT
+	iptables -A interfaces -i eth0 -j ACCEPT
+
+	# <Insert Custom Rules Here>
+
+	# <End Of Custom Rules
+
+	# Accept Darknet IP Block
+	# Warning: This is a security weak link. Comment it out
+	# to define port based rules. To allow http/https only, 
+	# iptables -A open -s 2.0.0.0/8 --dst-port 80 -j ACCEPT
+	iptables -A open -s 2.0.0.0/8 -j ACCEPT
+	
+	# Default deny rule
+	iptables -A open -s 2.0.0.0/8 -j DROP
+	
+	# Accept http/https (Comment out if not required)
+	iptables -A open -s 0.0.0.0 -p tcp --dport 80 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p tcp --dport 443 -j ACCEPT
+
+	# Accept DNS Requests (Comment out if not required)
+	iptables -A open -s 0.0.0.0 -p tcp --dport 53 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 53 -j ACCEPT
+	
+	# Accept OSPF (Comment out if OSPFd isnt running)
+	iptables -A open -s 0.0.0.0 -p tcp --dport 2604 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2604 -j ACCEPT
+
+	# Accept BGP (Required in most cases)
+	iptables -A open -s 0.0.0.0 -p tcp --dport 2605 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2605 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p tcp --dport 179 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 179 -j ACCEPT
+
+	# Allow openvpn ports (Modify to match configured ports)
+	iptables -A open -s 0.0.0.0 -p udp --dport 2000 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2001 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2002 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2003 -j ACCEPT
+	iptables -A open -s 0.0.0.0 -p udp --dport 2004 -j ACCEPT
+
+	# Keep state
+	iptables -A open -i eth0 -p tcp --syn -m state --state NEW -j NFQUEUE
+	
+	--End of Copy Paste--
+
+	NOTE: The above rules are rather generic. They can be customized based on
+	requirement.
+
+
+MAINTAINING AVAILABILITY
+[---------------------------------------------------------------------------]
+I.  In order to maximize access availability to the DarkNet (DN) each SA is
+    reponsible for monitoring connectivity, configuration, and security of
+    their respective firewall. Following can be used: 
+	I.I Connection Table: netstat -ap
+	I.II Routing Table: route -n
+	I.III Logged Users: w
+	I.IV Log files Location: /var/log
+	I.V Login History: dump-utmp /var/log/wtmp
+	I.VI Last Log: lastlog

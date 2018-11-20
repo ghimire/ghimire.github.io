@@ -1,0 +1,27 @@
+Quickstart
+
+svn co https://svn.ntop.org/svn/ntop/trunk/n2n n2n
+
+Download and compile the code
+Decide where to place your supernode. Suppose you put it on host a.b.c.d at port xyw.
+Decide what encryption password you want to use to secure your data. Suppose you use the password encryptme
+Decide the network name you want to use. Suppose you call it mynetwork. Note that you can use your supernode/edge nodes to handle multiple networks, not just one.
+Decide what IP address you plan to use on your edge nodes. Suppose you use IP address 10.1.2.0/24
+Start your applications:
+#supernode > supernode -l xyw
+#edge node1> edge -a 10.1.2.1 -c mynetwork  -k encryptme -l a.b.c.d:xyw
+#edge node2> edge -a 10.1.2.2 -c mynetwork  -k encryptme -l a.b.c.d:xyw
+Now test your n2n network:
+#edge node1>  ping 10.1.2.2
+#edge node2>  ping 10.1.2.1
+
+ON LINUX:
+ #edge node> edge -d n2n0 -c mynetwork -k encryptme -a 1.2.3.4 -l a.b.c.d:xyw
+ 
+ eg: # edge -d n2n -a 1.1.1.1 -c darknet -k s3cr37 -s 255.255.255.0 -l 192.168.0.9:1337
+
+------------------
+Supernode: 1.2.3.4:4890
+node1 (ns1): edge -f -a 172.13.37.1 -c darknet -k s0m3s3cr37 -l 1.2.3.4:4890
+node2 (production): edge -f-a 172.13.37.2 -c darknet -k s0m3s3cr37 -l 1.2.3.4:4890
+node3 (amdb0x): edge -f -a 172.13.37.3 -c darknet -k s0m3s3cr37 -l 1.2.3.4:4890

@@ -1,0 +1,55 @@
+=====Tinc Setup Guide for Darknet - ghimire=====
+# apt-get -y install tinc && cd /etc/tinc && mkdir -p /etc/tinc/darknet/{hosts,keys} 
+# touch /etc/tinc/nets.boot darknet/tinc{.conf,-up,-down}
+# tincd -n yournode -K
+
+Save Private Key as: /etc/tinc/darknet/keys/yournode_key.priv
+Save Public Key as: /etc/tinc/darknet/keys/yournode.pub
+
+/etc/tinc/darknet/tinc.conf
+---------------------------
+Name = yournode
+AddressFamily = any
+BindToAddress = <put local primary nic IP here>
+ConnectTo = othernode
+ConnectTo = friendsnode
+Hostnames = no
+KeyExpire = 3600
+Mode = router
+Device = /dev/net/tun
+Interface = darknet
+PrivateKeyFile = /etc/tinc/darknet/keys/yournode_key.priv
+
+
+/etc/tinc/darknet/tinc-up
+---------------------------
+#!/bin/sh
+ifconfig $INTERFACE 50.777.0.1 netmask 255.0.0.0 up
+
+/etc/tinc/darknet/tinc-down
+---------------------------
+#!/bin/sh
+ifconfig $INTERFACE down
+
+/etc/tinc/darknet/hosts/yournode
+--------------------------------
+Address = <put public ip here as it appears on internet>
+Cipher = blowfish
+Digest = sha1
+IndirectData = yes
+Subnet = 50.777.0.0/16
+
+/etc/tinc/nets.boot
+--------------------
+darknet
+
+Execute below commands in terminal:
+#  cat /etc/tinc/darknet/keys/yournode.pub >> /etc/tinc/darknet/hosts/yournode
+# chmod u+x /etc/tinc/darknet/tinc-*
+
+
+==NOTES==
+  - Replace 50.777.0.0/16 with subnet assigned to you. (Example: 50.65.4.0/24)
+  - Replace 50.777.0.1 above with first IP in subnet assigned to you. Leave the subnet mask to 255.0.0.0. (Example 50.65.4.1)
+  - All of the below commands must be executed as superuser.
+  - Do not forget to add peer's host files in /etc/tinc/darknet/hosts/ files. In the above example two additional hosts files should be present in /etc/tinc/darknet/hosts/ viz. othernode and friendsnode

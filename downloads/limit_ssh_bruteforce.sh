@@ -1,0 +1,2 @@
+iptables -A INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent --set --name SSH
+iptables -A INPUT -p tcp --dport 22 -i eth0 -m state --state NEW -m recent --update --seconds 60 --hitcount 7 --rttl --name SSH -j DROP

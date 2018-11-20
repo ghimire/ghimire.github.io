@@ -1,0 +1,22 @@
+cat << EOF > ${1}.conf
+port 2000
+proto udp
+dev tap
+ca /etc/openvpn/dnet/server-link/ca.crt
+cert /etc/openvpn/dnet/server-link/server.crt
+key /etc/openvpn/dnet/server-link/server.key
+dh /etc/openvpn/dnet/server-link/dh1024.pem
+server 1.0.0.0 255.255.255.252
+ifconfig-pool-persist /etc/openvpn/dnet/log/${1}-ipp.txt
+client-to-client
+keepalive 10 120
+comp-lzo
+user nobody
+group nobody
+# push "dhcp-option DNS 1.0.0.1"
+persist-key
+persist-tun
+status /etc/openvpn/dnet/log/${1}-status.log
+verb 3
+EOF
+

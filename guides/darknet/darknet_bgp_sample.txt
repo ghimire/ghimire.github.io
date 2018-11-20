@@ -1,0 +1,53 @@
+BGP On Dark side
+================
+router bgp 1007
+ bgp router-id 2.4.0.1
+ network 2.4.0.0/16
+ redistribute connected
+ neighbor 2.2.0.5 remote-as 1005
+ neighbor 2.2.0.5 route-map remote-server-bgp in
+ neighbor 2.2.0.5 route-map local out
+!
+access-list 5 permit 2.1.0.0 0.0.255.255
+access-list 5 permit 2.2.0.0 0.0.255.255
+access-list 5 permit 2.3.0.0 0.0.255.255
+access-list 5 deny any
+!
+ip as-path access-list 11 permit ^$
+ip as-path access-list 11 permit _1005_
+ip as-path access-list 20 permit ^$
+!
+route-map local permit 10
+ match as-path 20
+!
+route-map remote-server-bgp permit 10
+ match as-path 11
+ match ip address 5
+!
+
+BGP on remote-server
+======================
+router bgp 1005
+ bgp router-id 2.2.0.1
+ network 2.2.0.0/16
+ redistribute connected
+ neighbor 2.2.0.6 remote-as 1007
+ neighbor 2.2.0.6 route-map dark-bgp in
+ neighbor 2.2.0.6 route-map local out
+!
+access-list 5 permit 2.1.0.0 0.0.255.255
+access-list 5 permit 2.3.0.0 0.0.255.255
+access-list 5 permit 2.4.0.0 0.0.255.255
+access-list 5 deny any
+!
+ip as-path access-list 11 permit ^$
+ip as-path access-list 11 permit _1007_
+ip as-path access-list 20 permit ^$
+!
+route-map local permit 10
+ match as-path 20
+!
+route-map dark-bgp permit 10
+ match as-path 11
+ match ip address 5
+!

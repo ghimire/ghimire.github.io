@@ -1,0 +1,88 @@
+<?php
+// This file generates a dot, png or svg based network map given the BGP routing table
+// Quagga BGPd port is assumed to be 2605. Multiple routers and their ASN can be added.
+
+$format    = $_GET["format"];
+$ex    = $_GET["exclude"];
+if ( ! is_numeric($ex) ) {
+    $ex = 99999;
+}
+
+function getRoutes($ip, $myAS, $pa)    {
+    global $label;
+    global $dot;
+    global $ex;
+    $dot    .=    "myAS = $myAS, ex = $ex\n";
+    if ( $myAS    == $ex ) {
+        return;
+    }
+    # resource fsockopen ( string $hostname [, int $port [, int &$errno [, string &$errstr [, float $timeout]]]] )
+    $fh = @fsockopen("$ip", 2605, $err, $errstr, 2 );
+
+    if ( $fh ) {
+
+        fputs($fh, "$pa\nterminal length 0\nsh ip bgp\nexit\n");
+
+        while ( ! feof($fh) ) {
+            $line    = fgets($fh, 4096);
+            if ( preg_match("/^\*/", $line) ) {
+                $routeline    = $line;
+                $len    = strlen($routeline);
+                $AS_PATH    = trim(substr($routeline, 61, $len - 64 ));
+                #print $routeline;
+                #print $AS_PATH;
+                if ( $AS_PATH != "" && ! preg_match("/^$ex\ |\ $ex\ |\ $ex$|^$ex$/", $AS_PATH) ) {
+#                    $dot  .=  "AS_PATH=$AS_PATH<--\n";
+                    $AS_PATH2    = trim($AS_PATH);
+                    #$dot    .= "--->$AS_PATH2<---;\n";
+                    $ases    = split(" ", $AS_PATH2);
+                    $count    = 0;
+                    foreach ( $ases as $as ) { # foreach
+                        #$dot    .= "... $as ...\n";
+                        if ( $as != $myAS ) { # catch loops
+                            if ( $count == 0 ) {
+                                $dot    .= "$myAS -- $as;\n$as -- $myAS;\n";
+                            } else {
+                                $dot    .= "$oldas -- $as;\n$as -- $oldas;\n";
+                            }
+                        $oldas    = $as;
+                        $count++;
+                        } # end catch loops
+                    } # end foreach
+            }
+        }
+    }
+#$label    .= "AS $myAS ($ip), ";
+            $label .= "$myAS, ";
+        }
+    }
+
+putenv("TZ=UTC");
+$label    = "Generated at ".gmdate("Y-m-d H:i:s e").", from the data of\\nASes: ";
+
+// Specify routers and the ASN here
+getRoutes("50.6.0.1", 1005, "s0mep@ss");
+getRoutes("50.7.0.1", 1006, "s0mep@ss");
+getRoutes("50.8.0.1", 1007, "s0mep@ss");
+
+
+$dotuniq    = `echo "$dot" | sort | uniq`;
+
+if ( $format == "raw" ) {
+header("Content-type: text/plain");
+die("$dotuniq");
+}
+
+if ( $format == "png" ) {
+    header("Content-type: image/png");
+    } else {
+    header("Content-type: image/svg+xml");
+  }
+
+if ( $format    == "png" ) {
+    $dotformat    = "png";
+    } else {
+    $dotformat    = "svg";
+    }
+
+print `echo "strict graph bgp {\ngraph [label=\"\l$label\"];\n$dotuniq\n}\n" | dot -T$dotformat`;    

@@ -1,0 +1,309 @@
+=====DRBD + OCFS2 + HEARTBEAT2 + LAMP FAILOVER Guide - ghimire=====
+In this guide we will install drbd8 with ocfs2 for concurrent read/write operations. We will also 
+setup LAMP failover on top of drbd8+ocfs2 setup.
+
+Assumtpions:
+- 2 Nodes
+	Node 1
+		IP: 192.168.0.94
+		Replicated Partition: /dev/sdb1
+		NIC: 2 (eth0, eth1)
+		Services: LAMP
+	Node 2
+		IP: 192.168.0.95
+		Replicated Partition: /dev/sdb1
+		NIC: 2 (eth0, eth1)
+		Services: LAMP		
+	
+Let's start:
+
+							PART 1
+				++DRBD8 & OCFS2 with heartbeat++
+
+==Installing OCFS2 (Both nodes)==
+
+# apt-get install module-assistant
+# apt-get install openssh-server
+# apt-get install ocfs2-tools ocfs2console
+
+#File: /etc/ocfs2/cluster.conf
+------------------------------
+node:
+        ip_port = 7777
+        ip_address = 192.168.0.94
+        number = 0
+        name = node1
+        cluster = ocfs2
+node:
+        ip_port = 7777
+        ip_address = 192.168.0.95
+        number = 1
+        name = node2
+        cluster = ocfs2
+cluster:
+        node_count = 2
+        name = ocfs2
+
+# dpkg-reconfigure ocfs2-tools
+# /etc/init.d/o2cb restart
+# /etc/init.d/ocfs2 restart
+
+==Setting Up Bonding for NIC Failover (Optional)==
+
+# modprobe bonding
+# echo bonding mode=active-backup miimon=100 downdelay=200 updelay=200 >> /etc/modules
+# apt-get install ifenslave
+
+/etc/network/interfaces 
+    allow-hotplug bond0
+    iface bond0 inet static
+        address 192.168.0.94
+        netmask 255.255.255.0
+        network 192.168.0.0
+        gateway 192.168.0.1
+        up /sbin/ifenslave bond0 eth0
+        up /sbin/ifenslave bond0 eth1
+        dns-nameservers 208.67.222.222  208.67.220.220
+
+Note: Replicate above process on both nodes with correct IP addresses line.
+
+Restart Both Nodes at this point.
+
+==Installing DRBD8 (Both nodes)==
+
+# apt-get install drbd8-utils drbd8-module-source drbd8-source build-essential		
+# m-a -t build drbd8-source
+# cd /usr/src/ && dpkg -i drbd8-*.deb
+# mv /etc/drbd.conf /etc/drbd_backup.conf
+
+#File: /etc/drbd.conf
+---------------------
+global {
+        usage-count yes;
+}
+
+common {
+        protocol C;
+        syncer {
+                rate 10M;
+                al-extents 257;
+        }
+}
+
+resource mirror {
+        handlers {
+                pri-on-incon-degr "echo o > /proc/sysrq-trigger; halt -f";
+                pri-lost-after-sb "echo o > /proc/sysrq-trigger; halt -f";
+                local-io-error "echo o > /proc/sysrq-trigger; halt -f";
+                outdate-peer "/usr/sbin/drbd-peer-outdater";
+        }
+
+        startup {
+        }
+
+        disk {
+                on-io-error     detach;
+        }
+
+        net {
+                allow-two-primaries;
+                after-sb-0pri   disconnect;
+                after-sb-1pri   disconnect;
+                after-sb-2pri   disconnect;
+                rr-conflict     disconnect;
+                cram-hmac-alg   sha1;
+                shared-secret "putsecretkeyhere";
+        }
+
+        on node1 {
+                device /dev/drbd0;
+                disk /dev/sdb1;
+                address 192.168.0.94:7788;
+                flexible-meta-disk      internal;
+        }
+
+        on node2 {
+                device /dev/drbd0;
+                disk    /dev/sdb1;
+                address 192.168.0.95:7788;
+                meta-disk internal;
+        }
+}
+
+# dd if=/dev/zero of=/dev/sdb1
+# drbdadm create-md mirror
+# drbdadm down mirror
+# drbdadm up srv
+# drbdadm -- --overwrite-data-of-peer primary all
+# drbdadm primary srv
+
+# mkfs.ocfs2 /dev/drbd0
+# mount /dev/drbd0 /mirror
+
+	NOTE:
+		When primary fails:
+			On secondary type:# drbdadm primary srv & mount /srv
+
+		Takeing back primary when primary resumes:
+			On secondary type:# drbdadm secondary srv
+			On primary type:# drbdadm primary srv & mount /srv
+
+#File: /etc/init.d/mountdrbd.sh
+-------------------------------
+#!/bin/sh
+drbdadm primary srv
+mount.ocfs2 /dev/drbd0 /mirror
+
+# sudo chmode +x /etc/init.d/mountdrbd.sh
+# sudo ln -s /etc/init.d/mountdrbd.sh /etc/rc3.d/S99mountdrbd.sh
+# sudo ln -s /etc/init.d/mountdrbd.sh /etc/rc2.d/S99mountdrbd.sh
+
+==Installing HEARTBEAT2 (Both nodes)==
+
+# sudo apt-get install heartbeat-2
+
+#File: /etc/ha.d/ha.cf
+----------------------
+crm on
+bcast bond0
+node node1 node2
+
+#File: /etc/ha.d/authkeys
+-------------------------
+auth 1
+1 sha1	mysecretkey
+
+# chmod 600 /etc/ha.d/ha.cf
+# chmod 600 /etc/ha.d/authkeys
+
+# /etc/init.d/heartbeat restart
+
+# chgrp haclient /sbin/drbdsetup
+# chgrp haclient /sbin/drbdmeta
+
+# chmod o-x	/sbin/drbdsetup  /sbin/drbdmeta
+# chmod u+s /sbin/drbdsetup  /sbin/drbdmeta
+
+#File: /root/cluster/bootstrap.xml
+-----------------------------------
+<cluster_property_set id="bootstrap">
+ <attributes>
+  <nvpair id="bootstrap01" name="transition-idle-timeout" value="60"/>
+  <nvpair id="bootstrap02" name="default-resource-stickiness" value="INFINITY"/>
+  <nvpair id="bootstrap03" name="default-resource-failure-stickiness" value="-500"/>
+  <nvpair id="bootstrap04" name="stonith-enabled" value="true"/>
+  <nvpair id="bootstrap05" name="stonith-action" value="reboot"/>
+  <nvpair id="bootstrap06" name="symmetric-cluster" value="true"/>
+  <nvpair id="bootstrap07" name="no-quorum-policy" value="stop"/>
+  <nvpair id="bootstrap08" name="stop-orphan-resources" value="true"/>
+  <nvpair id="bootstrap09" name="stop-orphan-actions" value="true"/>
+  <nvpair id="bootstrap10" name="is-managed-default" value="true"/>
+ </attributes>
+</cluster_property_set>
+
+# ssh-keygen -t rsa
+# scp /root/.ssh/id_rsa.pub node2:/root/.ssh/authorized_keys
+
+#File: /root/cluster/stonith.xml
+--------------------------------
+<clone id="stonithcloneGroup" globally_unique="false">
+ <instance_attributes id="stonithcloneGroup">
+  <attributes>
+   <nvpair id="stonithclone01" name="clone_node_max" value="1"/>
+  </attributes>
+ </instance_attributes>
+ <primitive id="stonithclone" class="stonith" type="external/ssh" provider="heartbeat">
+  <operations>
+   <op name="monitor" interval="5s" timeout="20s" prereq="nothing" id="stonithclone-op01"/>
+   <op name="start" timeout="20s" prereq="nothing" id="stonithclone-op02"/>
+  </operations>
+ <instance_attributes id="stonithclone">
+  <attributes>
+   <nvpair id="stonithclonelist" name="hostlist" value="cluster1,cluster2"/>
+  </attributes>
+ </instance_attributes>
+ </primitive>
+</clone>
+
+# cibadmin -C -o resources -x /root/cluster/stonith.xml
+
+Split-Brain Recovery Procedure
+------------------------------
+On node that caused split brain:
+# umount /dev/drbd0
+# drbd secondary srv
+# drbd -- --discard-my-data connect srv
+# /etc/int.d/mountdrbd.sh
+
+On node that survived:
+# drbd connect srv
+
+Reference: [ http://www.drbd.org/users-guide/s-resolve-split-brain.html]
+
+							PART 2 
+					++SERVICES MIGRATION++
+Services Notes:
+	Change data directory to /mirror
+	Disable service from init.d because they will be started by heartbeat.
+
+== Migrating MYSQL ==
+
+# apt-get install mysql-server mysql-client
+# /etc/init.d/mysql stop
+# ssh node2 "/etc/init.d/mysql stop"
+
+#File: /etc/mysql/my.cf
+------------------------
+datadir = /mirror/mysql
+
+# mkdir -p /mirror/{www,mysql,dns,etc}
+# cp -Rp /etc/mysql /mirror/etc
+# rm -rf /etc/mysql
+# ssh node2 "rm -rf /etc/mysql"
+# ln -s /mirror/etc/mysql /etc/mysql
+# ssh node2 "ln -s /mirror/etc/mysql /etc/mysql"
+# cp -Rp /var/lib/mysql/* /mirror/mysql/
+# rm -rf /var/lib/mysql
+# ssh node2 "rm -rf /var/lib/mysql"
+# ln -s /mirror/mysql /var/lib/mysql
+# ssh node2 "ln -s /mirror/mysql /var/lib/mysql"
+# /etc/init.d/mysql stop; /etc/init.d/mysql start
+# ssh node2 "/etc/init.d/mysql stop; /etc/init.d/mysql start"
+
+== Migrating Apache ==
+
+# apt-get install apache2 apache2-utils libapache2-mod-php5
+# cp -Rp /etc/apache2 /mirror/etc
+# rm -rf /etc/apache2
+# ssh node2 "rm -rf /etc/apache2"
+# ln -sf /mirror/etc/apache2 /etc/apache2
+# ssh node2 "ln -sf /mirror/etc/apache2 /etc/apache2"
+
+# cp -Rp /var/www/* /mirror/www
+# rm -rf /var/www
+# ssh node2 "rm -rf /var/www"
+# ln -sf /mirror/www /var/
+# ssh node2 "ln -sf /mirror/www /var/"
+# chown -R www-data:www-data /mirror/www
+
+# cp -Rp /etc/php5 /mirror/etc
+# rm -rf /etc/php5
+# ssh node2 "rm -rf /etc/php5"		
+# ln -sf /mirror/etc/php5 /etc/php5
+# ssh node2 "ln -sf /mirror/etc/php5 /etc/php5"
+# /etc/init.d/apache stop; /etc/init.d/apache start
+
+== Migrating Bind ==
+
+# cp -Rp /etc/bind /mirror/etc/
+# rm -rf /etc/bind
+# ssh node2 "rm -rf /etc/bind"
+# ln -sf /mirror/etc/bind /etc/bind
+# ssh node2 "ln -sf /mirror/etc/bind /etc/bind"
+# /etc/init.d/bind9 stop; /etc/init.d/bind9 start
+
+Large part of this guide is adopted from following. I wish to thank the authors of each websites for their marvellous work.
+
+1. http://www.debian-administration.org/article/Heartbeat2_Xen_cluster_with_drbd8_and_OCFS2/print
+2. http://wildness.espix.org/index.php?post/2008/10/28/Debian-LAMP-Failover-cluster%3A-Implementation
+3. http://www.netexpertise.eu/en/linux/heartbeat-2-howto.html

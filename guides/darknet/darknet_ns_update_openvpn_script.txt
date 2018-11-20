@@ -1,0 +1,16 @@
+#!/bin/bash
+# ns-update script - ghimire
+# This script adds the darknet nameservers to /etc/resolv.conf and removes them upon disconnect
+# It is passed as an up/down arguments in openvpn client config
+case $script_type in
+up)
+        if [[ $(whoami) != "root" ]]; then
+                echo -e "You need to be root!";
+        else
+                export DNET_NS1='50.2.0.1' &&  export DNET_NS2='50.3.0.1' && grep -v \ 50\. /etc/resolv.conf | sed '0,/^\(.*\)/s//nameserver '${DNET_NS1}'\nnameserver '${DNET_NS2}'\n\1/' > /tmp/.$$; mv /tmp/.$$ /etc/resolv.conf
+        fi
+        ;;
+down)
+        grep -v \ 50\. /etc/resolv.conf > /tmp/.$$; mv /tmp/.$$ /etc/resolv.conf
+        ;;
+esac

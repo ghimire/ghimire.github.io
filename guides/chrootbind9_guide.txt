@@ -1,0 +1,32 @@
+===Running Chrooted Bind9 - ghimire====
+# apt-get install bind9 dnsutils
+# /etc/init.d/bind9 stop
+# vim /etc/default/bind9
+	RESOLVCONF=no
+	OPTIONS="-u bind -t /var/lib/named"
+# mkdir -p /var/lib/named/{etc,dev}
+# mkdir -p /var/lib/named/var/cache/bind
+# mkdir -p /var/lib/named/var/run/bind/run
+# mv /etc/bind /var/lib/named/etc
+# ln -s /var/lib/named/etc/bind /etc/bind
+# mknod /var/lib/named/dev/null c 1 3
+# mknod /var/lib/named/dev/random c 1 8
+# chmod 666 /var/lib/named/dev/null /var/lib/named/dev/random
+# chown -R bind:bind /var/lib/named/var/*
+# chown -R bind:bind /var/lib/named/etc/bind
+
+=====(debian 4.0 [etch])=====
+# vi /etc/default/syslogd
+	SYSLOGD="-a /var/lib/named/dev/log"
+# /etc/init.d/sysklogd restart
+=====(debian 5.0 [lenny])=====
+# vim /etc/rsyslog.d/bind-chroot.conf
+	$AddUnixListenSocket /var/lib/named/dev/log
+# /etc/init.d/rsyslog restart
+
+# /etc/init.d/bind9 start
+
+IPV6 NOTE:
+	mkdir /var/lib/named/proc
+	mount -t proc proc /var/lib/named/proc
+	Modify /etc/fstab to include the mountpoint

@@ -1,0 +1,123 @@
+       DarkNet SSH Policy - s0ttle
+
+Date: 8 August 2008
+  To: DarkNet SAs (System Administrators)
+
+SUBJECT: DarkNet Secure Shell Policy
+
+PURPOSE: The purpose of this document is to outline the baseline
+         policy for configuring and securing secure shell access.
+
+SCOPE: 
+	o Configuration
+	o Maintaining Security
+	o Maintaining Availability
+	o Providing Support
+	o Restrictions
+
+
+CONFIGURATION
+
+I.   The following configuration will be used in /etc/ssh/sshd_config:
+
+	Port 7888 
+	Protocol 2
+	Listen Address x.x.x.x
+	HostKey /etc/ssh/ssh_host_rsa_key
+	UsePrivillegeSeparation yes
+	Strict Modes yes
+	LoginGraceTime 30
+	MaxAuthTries 4
+	AllowUsers cytrix s0ttle ghimire duder
+	PubkeyAuthentication yes
+	ChallengeResponseAuthentication no
+	AuthorizedKeysFile %h/.ssh/authorized_keys2
+	Subsystem   sftp    /usr/libexec/openssh/sftp-server
+	IgnoreRhosts yes
+	HostbasedAuthentication no
+	IgnoreUserKnownHosts yes
+	PermitEmptyPasswords no
+	PermitRootLogin no
+	PasswordAuthentication no
+	RhostsRSAAuthentication no
+	X11Forwarding no
+	MaxStartups 5
+	UsePAM no
+
+II.  The remaining configuration options should be deleted. Site
+     specific settings should be submitted for review to ensure they
+     do not reduce the effectiveness of the above configuration.
+
+
+MAINTAINING SECURITY
+
+I.   In order to mitigate inadvertant or intentional modification(s)
+     to the configuration files each SA needs to ensure the following
+     precautions are in place:
+
+	A.  Set the immutable flag: chattr +i /etc/ssh/sshd_config
+	B.  Set Permissions:
+
+		sshd_config		0400
+		ssh_hosts_rsa_key	0600   
+		authorized_keys2	0400
+
+		~/.ssh			0755
+		/etc/ssh		0755
+		/usr/sbin/sshd		0555
+
+
+II.  Monitoring authentication success and failure will keep you abreast 
+     of emerging attack trends and allow for feedback on the implemented
+     security policy. Based on your OS one of the following files should
+     be mailed and audited at least once per week:
+
+	/var/log/secure || /var/log/authlog	
+
+
+III. Keep a sha1sum of the sshd binary offsite (audit weekly).
+
+	e0a20319bf8c15ce2da80bf100c6b79c26a2e154  /usr/sbin/sshd
+
+
+MAINTAINING AVAILABILITY
+
+I.   In order to maximize access availability to the DarkNet (DN) each SA is
+     responsible for monitoring security, configuration, and connectivity of
+     their respective secure shell daemon.
+
+II.  The following areas should be of primary concern for each DN SA: 
+    
+     	o Ensure sshd is active and accepting remote connections 
+     	o Verify sshd is bound to the configured interface and port
+        o Check authentication messages are being logged
+     
+III. This policy does not strictly require the implementation of third party
+     or native software that performs blocking, blacklisting, whitelisting,
+     rerouting, or dynamic ingress/egress modification. However, if the SA's
+     local policy requires the use of such software or features then a 
+     contingency access plan must be submitted for review.
+
+
+PROVIDING SUPPORT
+
+I.   Each SA will be required to provide support for their respective secure 
+     shell daemon. Support includes, but is not limited to connection settings
+     and authentication issues.
+
+II.  A secondary SA must be identified who has the necessary capacity to
+     address issues relating to the secure shell daemon.
+
+
+RESTRICTIONS
+
+[+] Local policy will NOT override or lower the standards set in this policy.
+[+] Distribution of this policy letter outside the DN is strictly prohibited.
+[+] Only the digitally signed copy of this policy letter is approved for use.  
+
+
+
+This policy will be reviewed monthly for compliance, changes, or updates. 
+
+
+== DRAFT == 

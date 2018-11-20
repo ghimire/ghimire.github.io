@@ -1,0 +1,19 @@
+cat << EOF > ${1}.conf
+client
+dev tap
+proto udp
+remote put-hostname-or-ip-here 2000
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+ca  /etc/openvpn/dnet/${1}/keys/ca.crt
+cert /etc/openvpn/dnet/${1}/keys/client.crt
+key /etc/openvpn/dnet/${1}/keys/client.key
+ns-cert-type server
+# route-method exe
+comp-lzo
+verb 3
+# pull
+EOF
+

@@ -1,0 +1,51 @@
+===Quagga Installation/Configuration For Darknet - Quick-HowTO (ghimire)===
+
+[[http://openmaniak.com/quagga_pre.php|Openmaniak.com]] has an excellent [[http://openmaniak.com/quagga.php|Quagga]] walk-through and tutorials. Please refer the site for advanced installation and configuration options. For our purpose we will install quagga and configure it to run ospfd.
+
+> Debian/Ubuntu
+apt-get install quagga
+> Gentoo
+ghimire quagga
+> Archlinux
+pacman -S quagga
+> FC/RedHat/SuSE
+yum install quagga
+> FreeBSD
+cd /usr/ports/net/quagga && make ENABLE_USER=root ENABLE_GROUP=wheel install
+
+
+  * After quagga is installed, start the zebra service with
+
+/etc/init.d/zebra start
+  * Start ospfd service
+
+/etc/init.d/ospfd start
+  * Start vtysh on the terminal as root
+
+sudo vtysh
+  * This part can be a little tricky. Refer [[blocks]] page to check the blocks assigned to you. Let us assume you have been assigned 2.0.0.4/30 for client connection to bigbox and 2.0.2.0/24 for your openvpn server. We'll put 2.0.2.0/24 into area 1 instead of backbone area 0 in-order to reduce the LSA flooding transactions. Within **vtysh console** type in following commands in sequential order
+
+
+ config t
+ service password-encryption
+ router ospf
+ area 0.0.0.1 stub
+ network 2.0.0.4/30 area 0.0.0.0
+ network 2.0.2.0/24 area 0.0.0.1
+ exit
+ exit
+ write
+
+  * Make sure zebra and ospf services are started during startup sequence if you will be running openvpn server for other clients.
+
+==vtysh commands==
+To check if ospf routes are being received
+show ip ospf
+To see ospf neighbor routers
+show ip ospf neighbor
+To see ospf router database
+show ip ospf database
+To ping main box
+ping 2.0.0.1
+To see routing table (OSPF routes are marked as O, Static as S, Directly Connected as C, and Kernel as K)
+show ip route

@@ -1,0 +1,2 @@
+# fill in the details in modify /etc/openvpn/easy-rsa/vars
+export MYCLIENT="putwhatever" && cd /etc/openvpn/easy-rsa && source ./vars && /bin/bash export KEY_CN=${MYCLIENT} && ./build-key --batch && zip ${MYCLIENT}.zip keys/${MYCLIENT}.?[^s]?

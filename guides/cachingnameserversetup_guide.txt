@@ -1,0 +1,20 @@
+===Darknet Caching Nameserver - ghimire===
+Take a look at Running Chrooted Bind9 guide before this.
+
+To run a caching Nameserver install bind9 (and preferably chroot it).
+Modify /etc/bind/named.conf.options file and uncomment/modify these lines within options {};
+
+        forwarders {
+                50.9.0.1;
+                50.5.0.1;
+        };
+
+Restart bind9.
+Add "nameserver 127.0.0.1" as a first entry of /etc/resolv.conf file.
+
+To verify your caching nameserver is working run:
+
+dig +short wiki.bin
+
+The output should match:
+50.2.0.1

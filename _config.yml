@@ -1,0 +1,13 @@
+markdown: rdiscount
+highlighter: rogue
+permalink: /posts/:title
+auto: true
+rdiscount:
+  extensions: [smart]
+
+name: ghimire
+url: http://ghimire.github.io
+description: Mind. Body. Code. Consciousness.
+twitter: ghimireprak
+github: ghimire
+gravatar_url: http://gravatar.com/avatar/4285dd5d4fcbd1899974807e228209d8
